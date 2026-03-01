@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TextDetox — Multilingual Text Detoxification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #060b17;
+    --bg2: #0d1526;
+    --bg3: #111d34;
+    --teal: #00e5cc;
+    --teal2: #00b8a2;
+    --red: #ff4e6a;
+    --yellow: #ffd166;
+    --text: #dce8f8;
+    --muted: #6b83a8;
+    --border: rgba(0,229,204,0.15);
+    --card: rgba(13,21,38,0.85);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow-x: hidden;
+    line-height: 1.7;
+  }
+
+  /* ── NOISE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
+    opacity: .6;
+  }
+
+  /* ── GRID BG ── */
+  body::after {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 80% 50% at 50% 0%, black 40%, transparent 80%);
+  }
+
+  section, header, footer { position: relative; z-index: 1; }
+
+  /* ── HEADER ── */
+  header {
+    padding: 80px 5vw 60px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 48px;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* ── SVG LOGO ── */
+  .logo-wrap {
+    flex-shrink: 0;
+  }
+
+  .logo-svg {
+    width: 120px; height: 120px;
+    filter: drop-shadow(0 0 24px rgba(0,229,204,0.5));
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { filter: drop-shadow(0 0 24px rgba(0,229,204,0.5)); }
+    50%       { filter: drop-shadow(0 0 40px rgba(0,229,204,0.9)); }
+  }
+
+  .header-text .tagline {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 10px;
+    opacity: .8;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2.4rem, 5vw, 4rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: #fff;
+  }
+
+  h1 span {
+    background: linear-gradient(90deg, var(--teal), #7af6f0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header-desc {
+    margin-top: 16px;
+    font-size: 1.05rem;
+    color: #8ba4c8;
+    max-width: 620px;
+    font-weight: 300;
+  }
+
+  .header-badges {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    margin-top: 24px;
+  }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 14px;
+    border-radius: 999px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.05em;
+    border: 1px solid;
+    transition: all .2s;
+    text-decoration: none;
+  }
+
+  .badge.teal  { border-color: var(--teal2); color: var(--teal); background: rgba(0,229,204,.07); }
+  .badge.red   { border-color: rgba(255,78,106,.4); color: #ff8096; background: rgba(255,78,106,.07); }
+  .badge.gold  { border-color: rgba(255,209,102,.4); color: var(--yellow); background: rgba(255,209,102,.07); }
+  .badge:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,229,204,.2); }
+
+  /* ── NAV ── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(6,11,23,.8);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 5vw;
+  }
+  nav ul {
+    max-width: 1200px; margin: 0 auto;
+    display: flex; gap: 0; list-style: none;
+  }
+  nav a {
+    display: block;
+    padding: 16px 18px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+  }
+  nav a:hover { color: var(--teal); border-bottom-color: var(--teal); }
+
+  /* ── SECTIONS ── */
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 5vw; }
+
+  section { padding: 80px 0; border-top: 1px solid var(--border); }
+
+  .section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(1.6rem, 3vw, 2.4rem);
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 32px;
+    letter-spacing: -.02em;
+  }
+
+  /* ── ABOUT GRID ── */
+  .about-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+    margin-top: 32px;
+  }
+  @media (max-width: 700px) { .about-grid { grid-template-columns: 1fr; } }
+
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    transition: border-color .2s, transform .2s;
+  }
+  .stat-card:hover { border-color: var(--teal2); transform: translateY(-3px); }
+  .stat-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 2.8rem;
+    font-weight: 800;
+    color: var(--teal);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-desc { color: var(--muted); font-size: .9rem; }
+
+  /* ── LANGUAGE FLAGS ── */
+  .lang-flags {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    margin-top: 24px;
+  }
+  .lang-chip {
+    padding: 6px 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: .7rem;
+    color: var(--muted);
+    background: var(--bg2);
+    transition: all .2s;
+  }
+  .lang-chip:hover { border-color: var(--teal); color: var(--teal); }
+
+  /* ── TASKS TIMELINE ── */
+  .timeline {
+    position: relative;
+    padding-left: 32px;
+    margin-top: 24px;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute; left: 8px; top: 0; bottom: 0;
+    width: 1px; background: var(--border);
+  }
+  .tl-item {
+    position: relative;
+    margin-bottom: 36px;
+    padding: 24px 28px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: border-color .2s;
+  }
+  .tl-item:hover { border-color: var(--teal2); }
+  .tl-item::before {
+    content: '';
+    position: absolute; left: -40px; top: 28px;
+    width: 10px; height: 10px;
+    border-radius: 50%; background: var(--teal);
+    box-shadow: 0 0 12px var(--teal);
+  }
+  .tl-year {
+    font-family: 'Space Mono', monospace;
+    font-size: .68rem; letter-spacing: .15em;
+    color: var(--teal); margin-bottom: 6px;
+  }
+  .tl-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.15rem; font-weight: 700;
+    color: #fff; margin-bottom: 8px;
+  }
+  .tl-desc { font-size: .9rem; color: var(--muted); }
+  .tl-link {
+    display: inline-block;
+    margin-top: 12px;
+    font-family: 'Space Mono', monospace;
+    font-size: .68rem; letter-spacing: .05em;
+    color: var(--teal);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color .2s;
+  }
+  .tl-link:hover { border-bottom-color: var(--teal); }
+
+  /* ── DATASETS ── */
+  .ds-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px; margin-top: 24px;
+  }
+  .ds-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    transition: all .2s;
+  }
+  .ds-card:hover { border-color: var(--teal2); transform: translateY(-3px); box-shadow: 0 8px 32px rgba(0,229,204,.1); }
+  .ds-type {
+    font-family: 'Space Mono', monospace; font-size: .62rem;
+    letter-spacing: .2em; text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .ds-type.en   { color: #64b5f6; }
+  .ds-type.ru   { color: #ce93d8; }
+  .ds-type.multi{ color: var(--teal); }
+  .ds-name {
+    font-family: 'Syne', sans-serif; font-size: 1.05rem;
+    font-weight: 700; color: #fff; margin-bottom: 8px;
+  }
+  .ds-desc { font-size: .85rem; color: var(--muted); margin-bottom: 14px; }
+  .ds-meta {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    font-family: 'Space Mono', monospace; font-size: .65rem;
+    color: var(--muted);
+  }
+  .ds-meta span {
+    background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+    padding: 3px 10px; border-radius: 4px;
+  }
+  .ds-link {
+    display: inline-block; margin-top: 14px;
+    font-family: 'Space Mono', monospace; font-size: .68rem;
+    color: var(--teal); text-decoration: none;
+    border-bottom: 1px solid transparent; transition: border-color .2s;
+  }
+  .ds-link:hover { border-bottom-color: var(--teal); }
+
+  /* ── MODELS ── */
+  .model-table {
+    width: 100%; border-collapse: collapse;
+    margin-top: 24px; font-size: .9rem;
+  }
+  .model-table th {
+    text-align: left; padding: 12px 16px;
+    font-family: 'Space Mono', monospace;
+    font-size: .65rem; letter-spacing: .15em;
+    text-transform: uppercase; color: var(--teal);
+    border-bottom: 1px solid var(--border);
+  }
+  .model-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+    color: var(--muted);
+  }
+  .model-table tr:hover td { background: rgba(0,229,204,.03); color: var(--text); }
+  .model-table td:first-child {
+    font-family: 'Space Mono', monospace;
+    font-size: .8rem; color: var(--text);
+  }
+  .model-table a { color: var(--teal); text-decoration: none; }
+  .model-table a:hover { text-decoration: underline; }
+  .pill {
+    display: inline-block; padding: 2px 10px;
+    border-radius: 4px; font-size: .7rem;
+    font-family: 'Space Mono', monospace;
+  }
+  .pill.cls { background: rgba(100,181,246,.1); color: #64b5f6; }
+  .pill.gen { background: rgba(255,209,102,.1); color: var(--yellow); }
+
+  /* ── EVALUATION ── */
+  .eval-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 20px; margin-top: 24px;
+  }
+  @media (max-width: 700px) { .eval-grid { grid-template-columns: 1fr; } }
+  .eval-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px 24px;
+    transition: all .2s; text-align: center;
+  }
+  .eval-card:hover { border-color: var(--teal2); transform: translateY(-3px); }
+  .eval-icon { font-size: 2rem; margin-bottom: 12px; }
+  .eval-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem; font-weight: 700;
+    color: #fff; margin-bottom: 8px;
+  }
+  .eval-abbr {
+    font-family: 'Space Mono', monospace;
+    font-size: .7rem; color: var(--teal);
+    margin-bottom: 10px;
+  }
+  .eval-desc { font-size: .82rem; color: var(--muted); }
+
+  .formula-box {
+    margin-top: 32px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 32px;
+    font-family: 'Space Mono', monospace;
+    font-size: 1.1rem;
+    text-align: center;
+    color: var(--teal);
+    letter-spacing: .05em;
+  }
+  .formula-box small { display: block; color: var(--muted); font-size: .72rem; margin-top: 10px; letter-spacing: .1em; }
+
+  /* ── PAPERS ── */
+  .paper-list { margin-top: 24px; }
+  .paper-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 16px;
+    transition: all .2s;
+    display: grid; grid-template-columns: 1fr auto;
+    gap: 16px; align-items: start;
+  }
+  .paper-item:hover { border-color: var(--teal2); transform: translateX(4px); }
+  .paper-venue {
+    font-family: 'Space Mono', monospace; font-size: .65rem;
+    letter-spacing: .15em; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .paper-venue.acl    { color: #64b5f6; }
+  .paper-venue.naacl  { color: #ce93d8; }
+  .paper-venue.emnlp  { color: #ffb74d; }
+  .paper-venue.coling { color: var(--teal); }
+  .paper-venue.ws     { color: #a5d6a7; }
+  .paper-venue.other  { color: var(--muted); }
+  .paper-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem; font-weight: 700;
+    color: #fff; margin-bottom: 8px; line-height: 1.4;
+  }
+  .paper-authors { font-size: .83rem; color: var(--muted); margin-bottom: 4px; }
+  .paper-authors strong { color: #b0c9e8; }
+  .paper-links { display: flex; flex-direction: column; gap: 8px; }
+  .paper-btn {
+    display: inline-block; padding: 6px 16px;
+    border-radius: 6px; font-family: 'Space Mono', monospace;
+    font-size: .65rem; letter-spacing: .08em;
+    text-decoration: none; white-space: nowrap;
+    border: 1px solid; transition: all .2s;
+  }
+  .paper-btn.pdf {
+    color: var(--teal); border-color: var(--teal2);
+    background: rgba(0,229,204,.07);
+  }
+  .paper-btn.pdf:hover { background: rgba(0,229,204,.18); }
+
+  /* ── TEAM ── */
+  .team-note {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px 32px;
+    margin-top: 24px;
+  }
+  .team-note p { color: var(--muted); font-size: .9rem; margin-bottom: 10px; }
+  .team-note p:last-child { margin-bottom: 0; }
+  .team-note a { color: var(--teal); }
+
+  /* ── FOOTER ── */
+  footer {
+    margin-top: 80px;
+    border-top: 1px solid var(--border);
+    padding: 40px 5vw;
+    display: flex; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 20px;
+  }
+  footer .ft-brand {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem; font-weight: 700; color: var(--teal);
+  }
+  footer p { font-size: .8rem; color: var(--muted); }
+  footer a { color: var(--teal); text-decoration: none; }
+
+  /* ── ANIMATIONS ── */
+  .fade-in { opacity: 0; transform: translateY(20px); transition: opacity .6s, transform .6s; }
+  .fade-in.visible { opacity: 1; transform: none; }
+
+  /* ── TOXIC → DETOX DEMO ── */
+  .demo-box {
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    gap: 20px; align-items: center; margin-top: 32px;
+  }
+  @media (max-width: 600px) {
+    .demo-box { grid-template-columns: 1fr; }
+    .demo-arrow { transform: rotate(90deg); }
+  }
+  .demo-side {
+    background: var(--card); border-radius: 12px; padding: 24px;
+    border: 1px solid;
+  }
+  .demo-side.toxic { border-color: rgba(255,78,106,.3); }
+  .demo-side.clean { border-color: rgba(0,229,204,.3); }
+  .demo-side-label {
+    font-family: 'Space Mono', monospace; font-size: .65rem;
+    letter-spacing: .2em; text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .demo-side.toxic .demo-side-label { color: var(--red); }
+  .demo-side.clean .demo-side-label { color: var(--teal); }
+  .demo-text { font-size: .95rem; line-height: 1.6; font-style: italic; color: var(--text); }
+  .demo-arrow { text-align: center; font-size: 2rem; color: var(--teal); opacity: .7; }
+</style>
+</head>
+<body>
+
+<!-- ══════════ HEADER ══════════ -->
+<header class="fade-in">
+  <div class="logo-wrap">
+    <svg class="logo-svg" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="grad1" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#00e5cc"/>
+          <stop offset="100%" stop-color="#0077ff"/>
+        </linearGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+          <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <!-- hexagon shield -->
+      <path d="M60 8 L104 32 L104 88 L60 112 L16 88 L16 32 Z"
+            fill="url(#grad1)" fill-opacity=".12" stroke="url(#grad1)" stroke-width="2"/>
+      <!-- inner hex -->
+      <path d="M60 22 L92 40 L92 80 L60 98 L28 80 L28 40 Z"
+            fill="url(#grad1)" fill-opacity=".08" stroke="url(#grad1)" stroke-width="1" stroke-opacity=".5"/>
+      <!-- strikethrough toxicity symbol -->
+      <circle cx="60" cy="60" r="20" stroke="#ff4e6a" stroke-width="2.5" stroke-opacity=".8"/>
+      <line x1="44" y1="44" x2="76" y2="76" stroke="#ff4e6a" stroke-width="2.5" stroke-linecap="round" stroke-opacity=".8"/>
+      <!-- sparkle dots -->
+      <circle cx="60" cy="38" r="3" fill="#00e5cc" filter="url(#glow)"/>
+      <circle cx="82" cy="60" r="3" fill="#00e5cc" filter="url(#glow)" opacity=".7"/>
+      <circle cx="60" cy="82" r="3" fill="#00e5cc" filter="url(#glow)"/>
+      <circle cx="38" cy="60" r="3" fill="#00e5cc" filter="url(#glow)" opacity=".7"/>
+      <!-- text DETOX -->
+      <text x="60" y="64" font-family="'Syne', sans-serif" font-weight="800"
+            font-size="11" fill="#ffffff" text-anchor="middle" dominant-baseline="middle"
+            filter="url(#glow)">DETOX</text>
+    </svg>
+  </div>
+
+  <div class="header-text">
+    <div class="tagline">// NLP for Social Good</div>
+    <h1><span>Text</span>Detox</h1>
+    <p class="header-desc">
+      A multilingual research initiative to automatically transform toxic language into neutral, fluent text — building safer digital spaces across 14+ languages worldwide.
+    </p>
+    <div class="header-badges">
+      <a class="badge teal" href="https://huggingface.co/textdetox" target="_blank">🤗 HuggingFace Org</a>
+      <a class="badge gold" href="https://pan.webis.de/clef25/pan25-web/text-detoxification.html" target="_blank">🏆 CLEF 2025 — Open Now</a>
+      <a class="badge teal" href="https://pan.webis.de/clef24/pan24-web/text-detoxification.html" target="_blank">CLEF 2024</a>
+      <a class="badge red" href="https://github.com/s-nlp/russe_detox_2022" target="_blank">⚡ RUSSE 2022</a>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════ NAV ══════════ -->
+<nav>
+  <ul>
+    <li><a href="#about">About</a></li>
+    <li><a href="#tasks">Shared Tasks</a></li>
+    <li><a href="#datasets">Datasets</a></li>
+    <li><a href="#models">Models</a></li>
+    <li><a href="#evaluation">Evaluation</a></li>
+    <li><a href="#papers">Papers</a></li>
+    <li><a href="#team">Team</a></li>
+  </ul>
+</nav>
+
+<!-- ══════════ ABOUT ══════════ -->
+<section id="about" class="fade-in">
+  <div class="container">
+    <div class="section-label">01 — About</div>
+    <h2>Detoxifying Language, One Sentence at a Time</h2>
+
+    <div style="max-width:760px; color:#8ba4c8; font-size:1rem; line-height:1.8; margin-bottom:32px;">
+      Text detoxification is a <em>Text Style Transfer (TST)</em> task: given a toxic sentence, produce a rewritten version that is
+      <strong style="color:var(--text)">non-toxic</strong>, <strong style="color:var(--text)">meaning-preserving</strong>, and <strong style="color:var(--text)">fluent</strong>.
+      Our research line — pioneered with parallel corpora for English and Russian — has grown into the largest multilingual detoxification ecosystem,
+      covering 14 languages and hosting two international shared tasks at CLEF 2024 &amp; 2025.
+    </div>
+
+    <!-- Live demo strip -->
+    <div class="demo-box">
+      <div class="demo-side toxic">
+        <div class="demo-side-label">☠ Toxic Input</div>
+        <div class="demo-text">"What the hell are you doing, you absolute idiot? Get out of my sight!"</div>
+      </div>
+      <div class="demo-arrow">→</div>
+      <div class="demo-side clean">
+        <div class="demo-side-label">✦ Detoxified Output</div>
+        <div class="demo-text">"What are you doing? Please leave — I need some space right now."</div>
+      </div>
+    </div>
+
+    <div class="about-grid" style="margin-top:40px;">
+      <div class="stat-card">
+        <div class="stat-num">14+</div>
+        <div class="stat-desc">Languages covered — English, Russian, Ukrainian, German, French, Spanish, Italian, Chinese, Japanese, Arabic, Hebrew, Hindi, Tatar, Amharic</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">3.6k+</div>
+        <div class="stat-desc">Parallel toxic↔neutral sentence pairs in the multilingual dataset, crowd-sourced and human-validated</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">11</div>
+        <div class="stat-desc">Open-source models on HuggingFace — classifiers, detoxification baselines, and LLM-based evaluators</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">3</div>
+        <div class="stat-desc">International shared tasks: RUSSE 2022, TextDetox CLEF 2024 &amp; 2025 — with teams from 20+ countries</div>
+      </div>
+    </div>
+
+    <div style="margin-top:36px;">
+      <div style="color:var(--muted); font-size:.85rem; margin-bottom:14px; font-family:'Space Mono',monospace; letter-spacing:.1em; text-transform:uppercase;">Supported Languages</div>
+      <div class="lang-flags">
+        <span class="lang-chip">🇬🇧 English</span><span class="lang-chip">🇷🇺 Russian</span>
+        <span class="lang-chip">🇺🇦 Ukrainian</span><span class="lang-chip">🇩🇪 German</span>
+        <span class="lang-chip">🇪🇸 Spanish</span><span class="lang-chip">🇫🇷 French</span>
+        <span class="lang-chip">🇮🇹 Italian</span><span class="lang-chip">🇨🇳 Chinese</span>
+        <span class="lang-chip">🇯🇵 Japanese</span><span class="lang-chip">🇸🇦 Arabic</span>
+        <span class="lang-chip">🇮🇱 Hebrew</span><span class="lang-chip">🇮🇳 Hindi</span>
+        <span class="lang-chip">Tatar</span><span class="lang-chip">🇪🇹 Amharic</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ SHARED TASKS ══════════ -->
+<section id="tasks" class="fade-in">
+  <div class="container">
+    <div class="section-label">02 — Shared Tasks</div>
+    <h2>Benchmarking the Community</h2>
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-year">2025 — CURRENTLY OPEN 🎉</div>
+        <div class="tl-title">TextDetox @ CLEF 2025</div>
+        <div class="tl-desc">
+          The second edition of the multilingual detoxification shared task at PAN/CLEF. Extended coverage, updated parallel corpora, and new LLM-based evaluation protocols. Teams compete across 9 languages with both automatic and human judgments.
+        </div>
+        <a class="tl-link" href="https://pan.webis.de/clef25/pan25-web/text-detoxification.html" target="_blank">→ Task Website</a>
+        &nbsp;&nbsp;
+        <a class="tl-link" href="https://huggingface.co/collections/textdetox/textdetox-2025-starter-kit-67dc3a8fd86111cac961ecc8" target="_blank">→ Starter Kit 🤗</a>
+      </div>
+      <div class="tl-item">
+        <div class="tl-year">2024</div>
+        <div class="tl-title">TextDetox @ CLEF 2024</div>
+        <div class="tl-desc">
+          First edition of the multilingual detoxification shared task at PAN 2024. Attracted international participants working on English, Russian, Ukrainian, German, Spanish, Chinese, Arabic, Hindi, and Amharic. Benchmark included crowdsourced parallel corpora and human evaluation.
+        </div>
+        <a class="tl-link" href="https://pan.webis.de/clef24/pan24-web/text-detoxification.html" target="_blank">→ Task Website</a>
+        &nbsp;&nbsp;
+        <a class="tl-link" href="https://ceur-ws.org/Vol-3740/paper-223.pdf" target="_blank">→ Overview Paper</a>
+      </div>
+      <div class="tl-item">
+        <div class="tl-year">2022</div>
+        <div class="tl-title">RUSSE Detoxification 2022</div>
+        <div class="tl-desc">
+          The first text detoxification shared task in Russian, held at the Dialogue 2022 conference. Featured the first parallel Russian detoxification corpus and manual human evaluation. Pioneered the crowdsourcing methodology later extended to 14 languages.
+        </div>
+        <a class="tl-link" href="https://github.com/s-nlp/russe_detox_2022" target="_blank">→ GitHub Repository</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ DATASETS ══════════ -->
+<section id="datasets" class="fade-in">
+  <div class="container">
+    <div class="section-label">03 — Datasets</div>
+    <h2>Parallel Corpora for Detoxification</h2>
+    <div class="ds-grid">
+
+      <div class="ds-card">
+        <div class="ds-type multi">Multilingual · 14 Languages</div>
+        <div class="ds-name">MultiParaDetox</div>
+        <div class="ds-desc">The flagship multilingual parallel corpus with toxic↔neutral pairs for 14 languages. Collected via crowd-sourcing pipeline extending the original ParaDetox methodology.</div>
+        <div class="ds-meta">
+          <span>3.6k+ pairs</span><span>14 languages</span><span>Parallel</span>
+        </div>
+        <a class="ds-link" href="https://huggingface.co/datasets/textdetox/multilingual_paradetox" target="_blank">→ 🤗 textdetox/multilingual_paradetox</a>
+      </div>
+
+      <div class="ds-card">
+        <div class="ds-type multi">Multilingual · Test Benchmark</div>
+        <div class="ds-name">MultiParaDetox Test Set</div>
+        <div class="ds-desc">Official held-out test benchmark used across CLEF 2024 &amp; 2025 shared tasks. Human-validated gold references for 9+ languages.</div>
+        <div class="ds-meta">
+          <span>9k samples</span><span>Multi-reference</span>
+        </div>
+        <a class="ds-link" href="https://huggingface.co/datasets/textdetox/multilingual_paradetox_test" target="_blank">→ 🤗 textdetox/multilingual_paradetox_test</a>
+      </div>
+
+      <div class="ds-card">
+        <div class="ds-type en">English</div>
+        <div class="ds-name">ParaDetox (EN)</div>
+        <div class="ds-desc">The first parallel English detoxification dataset. 10,000+ toxic sentences paired with human-written neutral paraphrases. Introduced at ACL 2022 — the foundation that started it all.</div>
+        <div class="ds-meta">
+          <span>10k+ pairs</span><span>English</span><span>ACL 2022</span>
+        </div>
+        <a class="ds-link" href="https://huggingface.co/datasets/s-nlp/paradetox" target="_blank">→ 🤗 s-nlp/paradetox</a>
+        <a class="ds-link" href="https://github.com/s-nlp/paradetox" target="_blank" style="margin-left:16px;">→ GitHub</a>
+      </div>
+
+      <div class="ds-card">
+        <div class="ds-type ru">Russian</div>
+        <div class="ds-name">Russian ParaDetox</div>
+        <div class="ds-desc">The first parallel Russian detoxification corpus, enabling the RUSSE 2022 shared task and the first seq2seq detoxification models for Russian.</div>
+        <div class="ds-meta">
+          <span>Russian</span><span>Parallel</span><span>RUSSE 2022</span>
+        </div>
+        <a class="ds-link" href="https://huggingface.co/datasets/s-nlp/ru_paradetox" target="_blank">→ 🤗 s-nlp/ru_paradetox</a>
+      </div>
+
+      <div class="ds-card">
+        <div class="ds-type multi">Multilingual · Toxicity</div>
+        <div class="ds-name">Multilingual Toxicity Dataset</div>
+        <div class="ds-desc">Large monolingual toxicity classification dataset across multiple languages. Used for training and fine-tuning the multilingual classifiers.</div>
+        <div class="ds-meta">
+          <span>71.4k samples</span><span>Classification</span>
+        </div>
+        <a class="ds-link" href="https://huggingface.co/datasets/textdetox/multilingual_toxicity_dataset" target="_blank">→ 🤗 textdetox/multilingual_toxicity_dataset</a>
+      </div>
+
+      <div class="ds-card">
+        <div class="ds-type multi">Multilingual · XAI</div>
+        <div class="ds-name">Multilingual Toxic Spans &amp; Lexicon</div>
+        <div class="ds-desc">Fine-grained explainability resources: span-level toxic word annotations and a multilingual lexicon of toxic terms across 14 languages — enabling the explainable detox pipeline.</div>
+        <div class="ds-meta">
+          <span>Toxic Spans: 8.79k</span><span>Lexicon: 176k</span>
+        </div>
+        <a class="ds-link" href="https://huggingface.co/datasets/textdetox/multilingual_toxic_spans" target="_blank">→ Toxic Spans</a>
+        <a class="ds-link" href="https://huggingface.co/datasets/textdetox/multilingual_toxic_lexicon" target="_blank" style="margin-left:12px;">→ Toxic Lexicon</a>
+      </div>
+
+      <div class="ds-card">
+        <div class="ds-type multi">Multilingual · XAI</div>
+        <div class="ds-name">Multilingual Toxicity Explained</div>
+        <div class="ds-desc">Human-annotated dataset providing natural language explanations for why a sentence is considered toxic — the first such resource for multiple languages.</div>
+        <div class="ds-meta">
+          <span>8.24k samples</span><span>Explanations</span>
+        </div>
+        <a class="ds-link" href="https://huggingface.co/datasets/textdetox/multilingual_toxicity_explained" target="_blank">→ 🤗 textdetox/multilingual_toxicity_explained</a>
+      </div>
+
+      <div class="ds-card">
+        <div class="ds-type en">Spanish</div>
+        <div class="ds-name">ES ParaDetox</div>
+        <div class="ds-desc">Parallel Spanish detoxification corpus collected via the MultiParaDetox pipeline, part of the multilingual expansion effort.</div>
+        <div class="ds-meta">
+          <span>Spanish</span><span>Parallel</span>
+        </div>
+        <a class="ds-link" href="https://huggingface.co/datasets/textdetox/es_paradetox" target="_blank">→ 🤗 textdetox/es_paradetox</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ MODELS ══════════ -->
+<section id="models" class="fade-in">
+  <div class="container">
+    <div class="section-label">04 — Models</div>
+    <h2>Open-Source Model Zoo</h2>
+    <table class="model-table">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Task</th>
+          <th>Size</th>
+          <th>Downloads</th>
+          <th>Link</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>xlmr-large-toxicity-classifier</td>
+          <td><span class="pill cls">Classification</span></td>
+          <td>0.3B</td>
+          <td>1.3k</td>
+          <td><a href="https://huggingface.co/textdetox/xlmr-large-toxicity-classifier" target="_blank">🤗 HF</a></td>
+        </tr>
+        <tr>
+          <td>xlmr-large-toxicity-classifier-v2</td>
+          <td><span class="pill cls">Classification</span></td>
+          <td>0.6B</td>
+          <td>934</td>
+          <td><a href="https://huggingface.co/textdetox/xlmr-large-toxicity-classifier-v2" target="_blank">🤗 HF</a></td>
+        </tr>
+        <tr>
+          <td>bert-multilingual-toxicity-classifier</td>
+          <td><span class="pill cls">Classification</span></td>
+          <td>0.2B</td>
+          <td>591</td>
+          <td><a href="https://huggingface.co/textdetox/bert-multilingual-toxicity-classifier" target="_blank">🤗 HF</a></td>
+        </tr>
+        <tr>
+          <td>glot500-toxicity-classifier</td>
+          <td><span class="pill cls">Classification</span></td>
+          <td>0.4B</td>
+          <td>689</td>
+          <td><a href="https://huggingface.co/textdetox/glot500-toxicity-classifier" target="_blank">🤗 HF</a></td>
+        </tr>
+        <tr>
+          <td>twitter-xlmr-toxicity-classifier</td>
+          <td><span class="pill cls">Classification</span></td>
+          <td>0.6B</td>
+          <td>107</td>
+          <td><a href="https://huggingface.co/textdetox/twitter-xlmr-toxicity-classifier" target="_blank">🤗 HF</a></td>
+        </tr>
+        <tr>
+          <td>mbart-detox-baseline</td>
+          <td><span class="pill gen">Generation</span></td>
+          <td>0.6B</td>
+          <td>9</td>
+          <td><a href="https://huggingface.co/textdetox/mbart-detox-baseline" target="_blank">🤗 HF</a></td>
+        </tr>
+        <tr>
+          <td>mt5-xl-detox-baseline</td>
+          <td><span class="pill gen">Generation</span></td>
+          <td>4B</td>
+          <td>8</td>
+          <td><a href="https://huggingface.co/textdetox/mt5-xl-detox-baseline" target="_blank">🤗 HF</a></td>
+        </tr>
+        <tr>
+          <td>Llama-pairwise-toxicity-evaluator</td>
+          <td><span class="pill gen">Evaluation</span></td>
+          <td>8B</td>
+          <td>5</td>
+          <td><a href="https://huggingface.co/textdetox/Llama-pairwise-toxicity-evaluator" target="_blank">🤗 HF</a></td>
+        </tr>
+        <tr>
+          <td>Llama-pairwise-content-evaluator</td>
+          <td><span class="pill gen">Evaluation</span></td>
+          <td>8B</td>
+          <td>—</td>
+          <td><a href="https://huggingface.co/textdetox/Llama-pairwise-content-evaluator" target="_blank">🤗 HF</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════ EVALUATION ══════════ -->
+<section id="evaluation" class="fade-in">
+  <div class="container">
+    <div class="section-label">05 — Evaluation</div>
+    <h2>How We Measure Quality</h2>
+    <div class="eval-grid">
+      <div class="eval-card">
+        <div class="eval-icon">🎯</div>
+        <div class="eval-label">Style Transfer Accuracy</div>
+        <div class="eval-abbr">STA</div>
+        <div class="eval-desc">Measures whether the output text is non-toxic. Computed via multilingual toxicity classifiers (XLM-R based). Range: 0 → 1.</div>
+      </div>
+      <div class="eval-card">
+        <div class="eval-icon">📐</div>
+        <div class="eval-label">Meaning Preservation</div>
+        <div class="eval-abbr">SIM</div>
+        <div class="eval-desc">Semantic similarity between toxic input and detoxified output. Computed using multilingual sentence encoders. Ensures no content is lost.</div>
+      </div>
+      <div class="eval-card">
+        <div class="eval-icon">✍️</div>
+        <div class="eval-label">Fluency</div>
+        <div class="eval-abbr">FL</div>
+        <div class="eval-desc">Measures grammaticality and naturalness. Computed as inverse perplexity from a language model. High FL = natural-sounding output.</div>
+      </div>
+    </div>
+
+    <div class="formula-box">
+      J = STA × SIM × FL
+      <small>JOINT SCORE — primary ranking metric across all shared task editions</small>
+    </div>
+
+    <div style="margin-top: 28px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px 28px;">
+      <div style="font-family:'Syne',sans-serif; font-size:1rem; font-weight:700; color:#fff; margin-bottom:12px;">LLM-as-Judge Evaluation (2025)</div>
+      <div style="color:var(--muted); font-size:.9rem; line-height:1.7;">
+        TextDetox 2025 introduces pairwise LLM-based evaluation using fine-tuned <strong style="color:var(--text)">Llama 3 8B</strong> models:
+        one judging toxicity style transfer, another judging content preservation — providing human-like assessment at scale.
+        Models are available open-source at <a href="https://huggingface.co/textdetox/Llama-pairwise-toxicity-evaluator" target="_blank" style="color:var(--teal);">textdetox/Llama-pairwise-toxicity-evaluator</a>.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ PAPERS ══════════ -->
+<section id="papers" class="fade-in">
+  <div class="container">
+    <div class="section-label">06 — Publications</div>
+    <h2>Research Papers</h2>
+    <div class="paper-list">
+
+      <div class="paper-item">
+        <div>
+          <div class="paper-venue coling">COLING 2025</div>
+          <div class="paper-title">Multilingual and Explainable Text Detoxification with Parallel Corpora</div>
+          <div class="paper-authors"><strong>Daryna Dementieva</strong>, Nikolay Babakov, Amit Ronen, Abinew Ali Ayele, Naquee Rizwan, Florian Schneider, Xintong Wang, Seid Muhie Yimam, Daniil Moskovskiy, Elisei Stakovskii, Eran Kaufman, Ashraf Elnagar, Animesh Mukherjee, Alexander Panchenko</div>
+          <div style="font-size:.8rem; color:var(--muted); margin-top:4px;">Extended multilingual corpora (DE, ZH, AR, HI, AM) + explainable analysis + Chain-of-Thought detox prompting</div>
+        </div>
+        <div class="paper-links">
+          <a class="paper-btn pdf" href="https://aclanthology.org/2025.coling-main.535/" target="_blank">PDF / ACL</a>
+        </div>
+      </div>
+
+      <div class="paper-item">
+        <div>
+          <div class="paper-venue ws">CLEF Working Notes 2024</div>
+          <div class="paper-title">Overview of the Multilingual Text Detoxification Task at PAN 2024</div>
+          <div class="paper-authors"><strong>Daryna Dementieva</strong>, Daniil Moskovskiy, Nikolay Babakov, Abinew Ali Ayele, Naquee Rizwan, Florian Schneider, Xintong Wang, Seid Muhie Yimam, Dmitry Ustalov, Elisei Stakovskii, Alisa Smirnova, Ashraf Elnagar, Animesh Mukherjee, Alexander Panchenko</div>
+          <div style="font-size:.8rem; color:var(--muted); margin-top:4px;">Comprehensive overview of TextDetox CLEF2024: participants, systems, results, and findings</div>
+        </div>
+        <div class="paper-links">
+          <a class="paper-btn pdf" href="https://ceur-ws.org/Vol-3740/paper-223.pdf" target="_blank">PDF</a>
+        </div>
+      </div>
+
+      <div class="paper-item">
+        <div>
+          <div class="paper-venue naacl">NAACL 2024</div>
+          <div class="paper-title">MultiParaDetox: Extending Text Detoxification with Parallel Data to New Languages</div>
+          <div class="paper-authors"><strong>Daryna Dementieva</strong>, Nikolay Babakov, Alexander Panchenko</div>
+          <div style="font-size:.8rem; color:var(--muted); margin-top:4px;">First automated multilingual parallel corpus collection pipeline; state-of-the-art detox in 9 languages</div>
+        </div>
+        <div class="paper-links">
+          <a class="paper-btn pdf" href="https://aclanthology.org/2024.naacl-short.12/" target="_blank">PDF / ACL</a>
+        </div>
+      </div>
+
+      <div class="paper-item">
+        <div>
+          <div class="paper-venue emnlp">IJCNLP-AACL 2023</div>
+          <div class="paper-title">Exploring Methods for Cross-lingual Text Style Transfer: The Case of Text Detoxification</div>
+          <div class="paper-authors"><strong>Daryna Dementieva</strong>, Daniil Moskovskiy, David Dale, Alexander Panchenko</div>
+          <div style="font-size:.8rem; color:var(--muted); margin-top:4px;">First study of simultaneous translation + detoxification; new automatic evaluation metrics with higher human correlation</div>
+        </div>
+        <div class="paper-links">
+          <a class="paper-btn pdf" href="https://aclanthology.org/2023.ijcnlp-short.12/" target="_blank">PDF</a>
+        </div>
+      </div>
+
+      <div class="paper-item">
+        <div>
+          <div class="paper-venue acl">ACL 2022</div>
+          <div class="paper-title">ParaDetox: Detoxification with Parallel Data</div>
+          <div class="paper-authors">Varvara Logacheva*, <strong>Daryna Dementieva*</strong>, Sergey Ustyantsev, Daniil Moskovskiy, David Dale, Irina Krotova, Nikita Semenov, Alexander Panchenko <em>(* equal contribution)</em></div>
+          <div style="font-size:.8rem; color:var(--muted); margin-top:4px;">First parallel English detoxification dataset. 10k+ crowdsourced pairs. 98+ citations. The paper that started the field.</div>
+        </div>
+        <div class="paper-links">
+          <a class="paper-btn pdf" href="https://aclanthology.org/2022.acl-long.469/" target="_blank">PDF / ACL</a>
+        </div>
+      </div>
+
+      <div class="paper-item">
+        <div>
+          <div class="paper-venue acl">ACL Student Workshop 2022</div>
+          <div class="paper-title">Exploring Cross-lingual Text Detoxification with Large Multilingual Language Models</div>
+          <div class="paper-authors">Daniil Moskovskiy, <strong>Daryna Dementieva</strong>, Alexander Panchenko</div>
+          <div style="font-size:.8rem; color:var(--muted); margin-top:4px;">First investigation of multilingual and cross-lingual detoxification behavior in large pretrained models</div>
+        </div>
+        <div class="paper-links">
+          <a class="paper-btn pdf" href="https://aclanthology.org/2022.acl-srw.26/" target="_blank">PDF</a>
+        </div>
+      </div>
+
+      <div class="paper-item">
+        <div>
+          <div class="paper-venue ws">Dialogue 2022</div>
+          <div class="paper-title">RUSSE-2022: Findings of the First Russian Detoxification Shared Task Based on Parallel Corpora</div>
+          <div class="paper-authors"><strong>Daryna Dementieva</strong>, Varvara Logacheva, Irina Nikishina, Alena Fenogenova, David Dale, Irina Krotova, Nikita Semenov, Tatiana Shavrina, Alexander Panchenko</div>
+          <div style="font-size:.8rem; color:var(--muted); margin-top:4px;">First Russian detox shared task; analysis of automatic vs. human evaluation; crowdsourcing pipeline methodology</div>
+        </div>
+        <div class="paper-links">
+          <a class="paper-btn pdf" href="https://github.com/s-nlp/russe_detox_2022" target="_blank">GitHub</a>
+        </div>
+      </div>
+
+      <div class="paper-item">
+        <div>
+          <div class="paper-venue other">Multimodal Technologies &amp; Interaction 2021</div>
+          <div class="paper-title">Methods for Detoxification of Texts for the Russian Language</div>
+          <div class="paper-authors"><strong>Daryna Dementieva</strong>, Daniil Moskovskiy, Varvara Logacheva, David Dale, Olga Kozlova, Nikita Semenov, Alexander Panchenko</div>
+          <div style="font-size:.8rem; color:var(--muted); margin-top:4px;">First study of automatic Russian text detoxification using BERT-based editing and GPT-2 seq2seq approaches. 81+ citations.</div>
+        </div>
+        <div class="paper-links">
+          <a class="paper-btn pdf" href="https://www.mdpi.com/2414-4088/5/9/54" target="_blank">PDF</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ TEAM ══════════ -->
+<section id="team" class="fade-in">
+  <div class="container">
+    <div class="section-label">07 — Team &amp; Contact</div>
+    <h2>Who We Are</h2>
+    <div class="team-note">
+      <p>
+        The TextDetox initiative is led by <strong>Daryna Dementieva</strong> (postdoctoral researcher at TU Munich, Social Computing Group), in collaboration with an international team of NLP researchers from TU Munich, Skoltech, IIT Kharagpur, University of Hamburg, UAE University, Bar-Ilan University, and others.
+      </p>
+      <p>
+        <strong>Core team:</strong> Daryna Dementieva, Nikolay Babakov, Daniil Moskovskiy, Elisei Stakovskii, Alisa Smirnova, Naquee Rizwan, Florian Schneider, Xintong Wang, Seid Muhie Yimam, Abinew Ali Ayele, Dmitry Ustalov, Ashraf Elnagar, Animesh Mukherjee, Alexander Panchenko.
+      </p>
+      <p>
+        We are happy to extend our research to more languages, cultures, and dimensions! 🌍
+        Contact: <a href="https://huggingface.co/dardem" target="_blank">Daryna Dementieva on HuggingFace</a> ·
+        <a href="https://soc.cit.tum.de/persons/daryna-dementieva/" target="_blank">TUM Profile</a> ·
+        <a href="https://aclanthology.org/people/daryna-dementieva/" target="_blank">ACL Anthology</a>
+      </p>
+    </div>
+
+    <div style="margin-top:28px; display:flex; flex-wrap:wrap; gap:14px;">
+      <a class="badge teal" href="https://huggingface.co/textdetox" target="_blank">🤗 HuggingFace Org</a>
+      <a class="badge teal" href="https://github.com/s-nlp/paradetox" target="_blank">⚙ ParaDetox GitHub</a>
+      <a class="badge red" href="https://github.com/s-nlp/russe_detox_2022" target="_blank">⚙ RUSSE 2022 GitHub</a>
+      <a class="badge gold" href="https://pan.webis.de/clef25/pan25-web/text-detoxification.html" target="_blank">🏆 Join CLEF 2025</a>
+      <a class="badge teal" href="https://toloka.ai/blog/can-llms-eliminate-toxicity-in-human-and-ai-generated-content-what-multilingual-research-shows/" target="_blank">📰 Press Coverage</a>
+      <a class="badge teal" href="https://youtu.be/8I5tZvcmIis" target="_blank">🎬 PyData Berlin Talk</a>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ FOOTER ══════════ -->
+<footer>
+  <div>
+    <div class="ft-brand">TextDetox</div>
+    <p>Multilingual Text Detoxification Research · NLP for Social Good</p>
+  </div>
+  <p>
+    <a href="https://huggingface.co/textdetox" target="_blank">HuggingFace</a> ·
+    <a href="https://github.com/s-nlp/paradetox" target="_blank">GitHub</a> ·
+    <a href="https://pan.webis.de/clef25/pan25-web/text-detoxification.html" target="_blank">CLEF 2025</a>
+  </p>
+</footer>
+
+<script>
+  // Intersection Observer for fade-in animations
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        obs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.08 });
+
+  document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
